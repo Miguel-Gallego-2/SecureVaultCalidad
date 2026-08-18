@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="co.edu.udea.securevault.perf.PerformanceTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-17T23:45:21.219Z" hostname="omarchy" time="1.643">
+  <properties/>
+  <testcase name="secureRandomEsMasLentoQueRandom()" classname="co.edu.udea.securevault.perf.PerformanceTest" time="0.365"/>
+  <testcase name="busquedaEnListaEscalaDeFormaLineal()" classname="co.edu.udea.securevault.perf.PerformanceTest" time="0.89"/>
+  <testcase name="busquedaPorMapaEsMasRapidaQuePorLista()" classname="co.edu.udea.securevault.perf.PerformanceTest" time="0.388"/>
+  <system-out><![CDATA[[Perf] Generacion: Random=317.62 ns/op | SecureRandom=2944.95 ns/op | SecureRandom es 9.3x mas lento
+[Perf] Escalado lista: 10k=15886.88 ns/op | 100k=272645.35 ns/op | 1M=5904491.00 ns/op
+[Perf] Busqueda: Lista=311383.09 ns/op | Mapa=110.45 ns/op | Mapa es 2819.3x mas rapido
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
