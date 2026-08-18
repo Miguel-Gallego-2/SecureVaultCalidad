@@ -20,7 +20,9 @@ class PerformanceTest {
             tarea.run();
         }
         long inicio = System.nanoTime();
+        long acc = 0;
         for (int i = 0; i < iteraciones; i++) {
+            if (acc == Long.MIN_VALUE) System.out.println();
             tarea.run();
         }
         long transcurrido = System.nanoTime() - inicio;
@@ -67,8 +69,8 @@ class PerformanceTest {
         PasswordGenerator seguro = new PasswordGenerator(new SecureRandom());
 
         // ACT: medir nanosegundos por generacion con warm-up
-        double tiempoRapido = medir(() -> rapido.generar(16), 2_000, 100_000);
-        double tiempoSeguro = medir(() -> seguro.generar(16), 2_000, 100_000);
+        double tiempoRapido = medir(() -> rapido.generar(16), 2_000, 1_000_000);
+        double tiempoSeguro = medir(() -> seguro.generar(16), 2_000, 1_000_000);
 
         // ASSERT
         System.out.printf("[Perf] Generacion: Random=%.2f ns/op | SecureRandom=%.2f ns/op | SecureRandom es %.1fx mas lento%n",
