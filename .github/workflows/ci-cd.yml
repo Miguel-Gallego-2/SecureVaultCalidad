@@ -1,0 +1,102 @@
+name: CI-CD
+
+# Cuando corre:
+#  - en cada push a main            -> CI + CD (si todo sale bien, publica un Release)
+#  - en cada Pull Request           -> solo CI (compila, prueba y analiza; NO entrega)
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  # -------------------------------------------------------------------------
+  # CI: compilar, pruebas unitarias, pruebas de aceptacion (Karate),
+  #     cobertura (JaCoCo) y analisis en SonarCloud con Quality Gate.
+  # -------------------------------------------------------------------------
+  build-test-analyze:
+    name: Build, pruebas y SonarCloud
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # historial completo: Sonar lo necesita para detectar "codigo nuevo"
+
+      - name: Instalar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle    # guarda las dependencias entre ejecuciones
+
+      - name: Cache de SonarCloud
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Compilar, probar (unitarias + Karate), medir cobertura y analizar
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # build  = compila + test + acceptanceTest
+        # sonar  = jacocoTestReport + envia a SonarCloud y espera el Quality Gate
+        run: ./gradlew build sonar
+
+      - name: Guardar reportes (pruebas, Karate, JaCoCo)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes
+          path: |
+            build/reports/tests/
+            build/karate-reports/
+            build/reports/jacoco/test/html/
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------
+  # CD: solo en main y solo si el job anterior (incluido el Quality Gate) paso.
+  #     Construye el JAR ejecutable y lo publica como GitHub Release.
+  # -------------------------------------------------------------------------
+  deliver:
+    name: Entrega (CD)
+    needs: build-test-analyze
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # necesario para crear el Release
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v6
+
+      - name: Instalar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Construir el JAR ejecutable
+        run: ./gradlew jar
+
+      - name: Prueba de humo del JAR (abre el menu y sale con la opcion 0)
+        run: printf '0\n' | java -jar build/libs/*.jar | grep "Saliendo..."
+
+      - name: Guardar el JAR como artefacto del workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: securevault-jar
+          path: build/libs/*.jar
+
+      - name: Publicar GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.0.${{ github.run_number }}" build/libs/*.jar \
+            --target "${{ github.sha }}" \
+            --title "SecureVault v1.0.${{ github.run_number }}" \
+            --generate-notes
