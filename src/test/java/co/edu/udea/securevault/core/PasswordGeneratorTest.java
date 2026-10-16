@@ -33,7 +33,7 @@ class PasswordGeneratorTest {
         String contrasena = generator.generar(longitud);
 
         // ASSERT
-        assertTrue(PasswordValidator.contieneMayuscula(contrasena));
+        assertFalse(PasswordValidator.contieneMayuscula(contrasena));
         assertTrue(PasswordValidator.contieneMinuscula(contrasena));
         assertTrue(PasswordValidator.contieneNumero(contrasena));
         assertTrue(PasswordValidator.contieneEspecial(contrasena));

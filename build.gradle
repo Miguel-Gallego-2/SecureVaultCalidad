@@ -1,5 +1,7 @@
 plugins {
     id 'java'
+    id 'jacoco'                                   // mide la cobertura de pruebas
+    id 'org.sonarqube' version '7.5.0.8588'       // envia el analisis a SonarCloud
 }
 
 group = 'co.edu.udea'
@@ -12,18 +14,93 @@ repositories {
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+
+    // Karate: pruebas de aceptacion (archivos .feature)
+    testImplementation 'io.karatelabs:karate-junit5:1.5.2'
 }
 
-test {
-    useJUnitPlatform()
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pruebas
+//   - test            -> pruebas unitarias (JUnit)
+//   - acceptanceTest  -> pruebas de aceptacion (Karate), marcadas con @Tag("acceptance")
+// ---------------------------------------------------------------------------
+tasks.withType(Test).configureEach {
     testLogging {
         events 'passed', 'skipped', 'failed'
         showStandardStreams = true
     }
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+test {
+    useJUnitPlatform {
+        excludeTags 'acceptance'
+    }
+}
+
+tasks.register('acceptanceTest', Test) {
+    description = 'Ejecuta las pruebas de aceptacion con Karate.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'acceptance'
+    }
+    shouldRunAfter test
+}
+
+// "gradlew build" ejecuta tambien las pruebas de aceptacion
+tasks.named('check') {
+    dependsOn 'acceptanceTest'
+}
+
+// ---------------------------------------------------------------------------
+// JaCoCo: cobertura combinando unitarias + aceptacion
+// El XML es el que lee SonarCloud.
+// ---------------------------------------------------------------------------
+jacocoTestReport {
+    dependsOn 'test', 'acceptanceTest'
+    // datos de ejecucion de ambas tareas: build/jacoco/test.exec y build/jacoco/acceptanceTest.exec
+    executionData.setFrom(fileTree(dir: layout.buildDirectory.dir('jacoco').get().asFile, include: '*.exec'))
+    reports {
+        xml.required = true     // build/reports/jacoco/test/jacocoTestReport.xml  (para Sonar)
+        html.required = true    // build/reports/jacoco/test/html/index.html       (para ti)
+        csv.required = false
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SonarCloud
+// OJO: sonar.projectKey y sonar.organization deben coincidir con lo que te
+// muestre SonarCloud al importar el repositorio (ver docs/GUIA_CALIDAD.md).
+// El token NO va aqui: se entrega por la variable de entorno SONAR_TOKEN.
+// ---------------------------------------------------------------------------
+sonar {
+    properties {
+        property 'sonar.projectKey', 'Miguel-Gallego-2_SecureVaultCalidad'
+        property 'sonar.organization', 'miguel-gallego-2'
+        property 'sonar.host.url', 'https://sonarcloud.io'
+        // Ruta del reporte JaCoCo (XML) para que Sonar muestre la cobertura
+        property 'sonar.coverage.jacoco.xmlReportPaths', 'build/reports/jacoco/test/jacocoTestReport.xml'
+        // Si el Quality Gate falla, el comando falla (y el pipeline NO entrega)
+        property 'sonar.qualitygate.wait', 'true'
+    }
+}
+
+tasks.named('sonar') {
+    dependsOn 'jacocoTestReport'
+}
+
+// ---------------------------------------------------------------------------
+// JAR ejecutable (lo que entrega el CD):  java -jar build/libs/SecureVault-1.0.0.jar
+// ---------------------------------------------------------------------------
+jar {
+    manifest {
+        attributes 'Main-Class': 'co.edu.udea.securevault.cli.Main'
     }
 }
